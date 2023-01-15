@@ -3,22 +3,34 @@ package com.github.gmazelier.tasks
 import net.sf.jasperreports.engine.JasperCompileManager
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
+import org.gradle.api.file.Directory
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.*
 import org.gradle.api.tasks.incremental.IncrementalTaskInputs
+import org.gradle.work.ChangeType
+import org.gradle.work.Incremental
+import org.gradle.work.InputChanges
 
 import java.nio.file.Path
 import java.nio.file.Paths
 
 import static groovyx.gpars.GParsPool.withPool
 
-class JasperReportsCompile extends DefaultTask {
+@CacheableTask
+abstract class JasperReportsCompile extends DefaultTask {
 
 	@InputFiles
+	@PathSensitive(PathSensitivity.RELATIVE)
 	Iterable<File> classpath
+
 	@InputDirectory
-	def File srcDir
+	@Incremental
+	@PathSensitive(PathSensitivity.RELATIVE)
+	abstract DirectoryProperty getSrcDir();
+
 	@OutputDirectory
-	def File outDir
+	abstract DirectoryProperty getOutDir();
 	@Input
 	def String srcExt
 	@Input
@@ -31,7 +43,7 @@ class JasperReportsCompile extends DefaultTask {
 	def log = getLogger()
 
 	@TaskAction
-	void execute(IncrementalTaskInputs inputs) {
+	void execute(InputChanges inputChanges) {
 
 		def dependencies = classpath.collect { dependency ->
 			dependency?.toURI()?.toURL()
@@ -39,14 +51,16 @@ class JasperReportsCompile extends DefaultTask {
 		if (verbose) log.lifecycle "Additional classpath: ${dependencies}"
 
 		def compilationTasks = []
-		inputs.outOfDate { change ->
-			if (change.file.name.endsWith(srcExt))
-				compilationTasks << [src: change.file, out: outputFile(change.file), deps: dependencies]
-		}
-		inputs.removed { change ->
-			if (verbose) log.lifecycle "Removed file ${change.file.name}"
-			def fileToRemove = outputFile(change.file)
-			fileToRemove.delete()
+		inputChanges.getFileChanges(srcDir).each { change ->
+			if (change.changeType == ChangeType.REMOVED) {
+				if (verbose) log.lifecycle "Removed file ${change.file.name}"
+				def fileToRemove = outDir.file(change.normalizedPath.replaceAll(srcExt, outExt)).get().asFile
+				fileToRemove.delete()
+			} else {
+				if (change.file.name.endsWith(srcExt)) {
+					compilationTasks << [src: change.getFile(), out: outputFile(change.getFile()), deps: dependencies]
+				}
+			}
 		}
 
 		def start = System.currentTimeMillis()
@@ -58,7 +72,7 @@ class JasperReportsCompile extends DefaultTask {
 				def out = task['out'] as File
 				def deps = task['deps']
 
-				if (verbose) log.lifecycle "Compiling file ${src.name}"
+				if (verbose) log.lifecycle "Compiling file ${src.absolutePath} to ${out.absolutePath}"
 
 				try {
 					// Configure class loader with addtional dependencies
@@ -87,7 +101,7 @@ class JasperReportsCompile extends DefaultTask {
 	def File outputFile(File src) {
 
 		// local variable so we aren't continuously appending to the outDir
-		def useOutDir = outDir
+		def useOutDir = outDir.get().asFile;
 
 		if (useRelativeOutDir) {
 

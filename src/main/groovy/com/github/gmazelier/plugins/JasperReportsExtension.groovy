@@ -1,13 +1,17 @@
 package com.github.gmazelier.plugins
 
 import org.gradle.api.Project
+import org.gradle.api.file.Directory
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.model.ObjectFactory
+import org.gradle.api.provider.Provider
 
 class JasperReportsExtension {
 
 	Iterable<File> classpath = []
-	File srcDir = new File('src/main/jasperreports')
-	File tmpDir = new File("${project.buildDir}/jasperreports")
-	File outDir = new File("${project.buildDir}/classes/main")
+	DirectoryProperty srcDir;
+	DirectoryProperty tmpDir;
+	DirectoryProperty outDir;
 	String srcExt = '.jrxml'
 	String outExt = '.jasper'
 	String compiler = 'net.sf.jasperreports.engine.design.JRJdtCompiler'
@@ -20,6 +24,15 @@ class JasperReportsExtension {
 
 	JasperReportsExtension(Project project) {
 		this.project = project
+		this.srcDir= project.getObjects().directoryProperty();
+		this.outDir= project.getObjects().directoryProperty();
+		this.tmpDir= project.getObjects().directoryProperty();
+		setDefaults();
 	}
 
+	void setDefaults() {
+		srcDir.convention(project.layout.projectDirectory.dir("src/main/jasperreports"));
+		outDir.convention(project.layout.buildDirectory.dir("classes/jasper/main"))
+		tmpDir.convention(project.layout.buildDirectory.dir("jasperreports"));
+	}
 }

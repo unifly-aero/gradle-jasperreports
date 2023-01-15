@@ -4,23 +4,31 @@ import net.sf.jasperreports.engine.DefaultJasperReportsContext
 import net.sf.jasperreports.engine.JasperReportsContext
 import org.gradle.api.DefaultTask
 import org.gradle.api.InvalidUserDataException
+import org.gradle.api.file.Directory
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 
 import static net.sf.jasperreports.engine.design.JRCompiler.*
 import static net.sf.jasperreports.engine.xml.JRReportSaxParserFactory.COMPILER_XML_VALIDATION
 
-class JasperReportsPreCompile extends DefaultTask {
+@CacheableTask
+abstract class JasperReportsPreCompile extends DefaultTask {
 
 	@InputDirectory
-	File srcDir
+	@PathSensitive(PathSensitivity.RELATIVE)
+	abstract DirectoryProperty getSrcDir();
 	@OutputDirectory
-	File tmpDir
+	abstract DirectoryProperty getTmpDir();
 	@OutputDirectory
-	File outDir
+	abstract DirectoryProperty getOutDir();
 	@Input
 	String srcExt
 	@Input
@@ -65,20 +73,22 @@ class JasperReportsPreCompile extends DefaultTask {
 		context.setProperty COMPILER_XML_VALIDATION, String.valueOf(validateXml)
 		context.setProperty COMPILER_PREFIX, compiler
 		context.setProperty COMPILER_KEEP_JAVA_FILE, String.valueOf(keepJava)
-		context.setProperty COMPILER_TEMP_DIR, tmpDir.canonicalPath
+		context.setProperty COMPILER_TEMP_DIR, tmpDir.getAsFile().get().canonicalPath
 	}
 
 	@Internal
-	def checkDirectory = { directory, isOutputDirectory ->
+	def checkDirectory = { directoryProp, isOutputDirectory ->
+		File directory = directoryProp.get().asFile;
+
 		// If exists, it must be a directory
-		if (directory?.exists() && !directory.isDirectory())
+		if (directory.exists() && !directory.isDirectory())
 			return [directory, "${directory} is not a directory!"]
 
 		// If is an output directory and does not exist, create it
 		if (isOutputDirectory && !directory.exists() && !directory.mkdirs())
 			return [directory, "${directory} cannot be created!"]
 
-		// If is an output directory, it must be writable
+//		 If is an output directory, it must be writable
 		if (isOutputDirectory && !directory.canWrite())
 			return [directory, "${directory} is not writeable!"]
 
@@ -90,9 +100,9 @@ class JasperReportsPreCompile extends DefaultTask {
 
 		getLogger().with {
 			lifecycle ">>> JasperReports Plugin Configuration"
-			lifecycle "Source directory: ${srcDir.canonicalPath}"
-			lifecycle "Temporary directory: ${tmpDir.canonicalPath}"
-			lifecycle "Output directory: ${outDir.canonicalPath}"
+			lifecycle "Source directory: ${srcDir.get().asFile.canonicalPath}"
+			lifecycle "Temporary directory: ${tmpDir.get().asFile.canonicalPath}"
+			lifecycle "Output directory: ${outDir.get().asFile.canonicalPath}"
 			lifecycle "Source files extension: ${srcExt}"
 			lifecycle "Compiled files extension: ${outExt}"
 			lifecycle "Compiler: ${compiler}"

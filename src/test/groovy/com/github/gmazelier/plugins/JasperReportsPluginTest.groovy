@@ -41,9 +41,9 @@ class JasperReportsPluginTest extends GroovyTestCase {
 
 		def jasperreports = project.jasperreports as JasperReportsExtension
 		assert jasperreports.classpath == []
-		assert jasperreports.srcDir == new File('src/main/jasperreports')
-		assert jasperreports.tmpDir == new File("${project.buildDir}/jasperreports")
-		assert jasperreports.outDir == new File("${project.buildDir}/classes/main")
+		assert jasperreports.srcDir.get().asFile.absolutePath == project.file('src/main/jasperreports').absolutePath
+		assert jasperreports.tmpDir.get().asFile.absolutePath == project.file("${project.buildDir}/jasperreports").absolutePath
+		assert jasperreports.outDir.get().asFile.absolutePath == project.file("${project.buildDir}/classes/jasper/main").absolutePath
 		assert jasperreports.srcExt == '.jrxml'
 		assert jasperreports.outExt == '.jasper'
 		assert jasperreports.compiler == 'net.sf.jasperreports.engine.design.JRJdtCompiler'
@@ -65,17 +65,16 @@ class JasperReportsPluginTest extends GroovyTestCase {
 			outDir = out
 		}
 		project.evaluate()
+		assert project.jasperreports.srcDir.get().asFile.absolutePath.endsWith(src.path)
+		assert project.tasks.prepareReportsCompilation.srcDir.get().asFile.absolutePath.endsWith(src.path)
+		assert project.tasks.compileAllReports.srcDir.get().asFile.absolutePath.endsWith(src.path)
 
-		assert src == project.jasperreports.srcDir
-		assert src == project.tasks.prepareReportsCompilation.srcDir
-		assert src == project.tasks.compileAllReports.srcDir
+		assert project.jasperreports.tmpDir.get().asFile.absolutePath.endsWith(tmp.path)
+		assert project.tasks.prepareReportsCompilation.tmpDir.get().asFile.absolutePath.endsWith(tmp.path)
 
-		assert tmp == project.jasperreports.tmpDir
-		assert tmp == project.tasks.prepareReportsCompilation.tmpDir
-
-		assert out == project.jasperreports.outDir
-		assert out == project.tasks.prepareReportsCompilation.outDir
-		assert out == project.tasks.compileAllReports.outDir
+		assert project.jasperreports.outDir.get().asFile.absolutePath.endsWith(out.path)
+		assert project.tasks.prepareReportsCompilation.outDir.get().asFile.absolutePath.endsWith(out.path)
+		assert project.tasks.compileAllReports.outDir.get().asFile.absolutePath.endsWith(out.path)
 	}
 
 	public void testPluginSpreadsExtOptions() {
